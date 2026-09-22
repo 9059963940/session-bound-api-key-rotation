@@ -1,10 +1,10 @@
 # Session-Bound API Key Rotation via Usage-Pattern Fingerprinting
 
-A local academic security prototype that detects abnormal API-key usage patterns and automatically rotates suspicious API credentials.
+A behavior-driven API security prototype that detects abnormal API-key usage patterns and automatically rotates suspicious API credentials.
 
-The system establishes a behavioral baseline for each API key and evaluates live requests against that baseline. When abnormal behavior produces a sufficiently high risk score, the system revokes the existing API key and generates a new session-bound API key.
+The system establishes a behavioral baseline for each API key, analyzes incoming requests using usage-pattern features, detects anomalous behavior with an Isolation Forest model, calculates a security risk score, and automatically revokes and replaces a compromised API key when the configured risk threshold is exceeded.
 
-> **Note:** This is a research/academic prototype intended for local experimentation and demonstration. It is not a production secrets-management system.
+> **Note:** This is a research/academic prototype designed for local experimentation and demonstration. It is not a production secrets-management or KMS/HSM system.
 
 ---
 
@@ -12,39 +12,76 @@ The system establishes a behavioral baseline for each API key and evaluates live
 
 Traditional API-key rotation is commonly based on fixed schedules or manual intervention.
 
-This project explores a behavior-driven approach in which API-key usage is continuously monitored. The system observes request characteristics, establishes a per-key behavioral baseline, detects deviations using anomaly detection, calculates a risk score, and automatically rotates the affected credential when the configured threshold is exceeded.
+This project explores a behavior-driven approach in which API-key usage is continuously monitored. Instead of relying only on time-based rotation, the system evaluates changes in how a credential is being used.
 
-### Core Flow
+The prototype analyzes characteristics such as:
+
+- Request timing
+- Endpoint usage
+- Request behavior
+- Client fingerprint
+- Payload-related features
+- Historical usage patterns
+
+When sufficiently abnormal behavior is detected, the system:
+
+1. Calculates an anomaly score.
+2. Calculates a security risk score.
+3. Determines whether the risk threshold has been exceeded.
+4. Revokes the existing API key.
+5. Generates a new session-bound API key.
+6. Records the rotation event in the audit log.
+7. Allows the new key to continue legitimate access.
+
+---
+
+## Architecture
 
 ```text
-Client
-   |
-   v
-API Gateway
-   |
-   v
-Request / Usage Profiler
-   |
-   +----------------------+
-   |                      |
-   v                      v
-Behavioral Features   Audit Logging
-   |
-   v
-Isolation Forest
-   |
-   v
-Risk Scoring / Decision Engine
-   |
-   +----------------------+
-   |
-   v
-Key Vault
-   |
-   +----------------------+
-   |
-   v
-Revoke Old Key
-   |
-   v
-Generate New Session-Bound Key
+                         +------------------+
+                         |      Client      |
+                         +--------+---------+
+                                  |
+                                  v
+                         +------------------+
+                         |   API Gateway    |
+                         |    FastAPI       |
+                         +--------+---------+
+                                  |
+                                  v
+                     +------------------------+
+                     | Request / Usage        |
+                     | Profiler               |
+                     +-----------+------------+
+                                 |
+                +----------------+----------------+
+                |                                 |
+                v                                 v
+      +-------------------+             +-------------------+
+      | Behavioral        |             | Audit Logging     |
+      | Feature Extraction|             |                   |
+      +---------+---------+             +-------------------+
+                |
+                v
+      +-------------------+
+      | Isolation Forest  |
+      | Anomaly Detection |
+      +---------+---------+
+                |
+                v
+      +-------------------+
+      | Risk Scoring &    |
+      | Decision Engine   |
+      +---------+---------+
+                |
+                | High Risk
+                v
+      +-------------------+
+      |     Key Vault     |
+      +---------+---------+
+                |
+        +-------+--------+
+        |                |
+        v                v
+  Revoke Old Key   Generate New
+                   Session-Bound Key
