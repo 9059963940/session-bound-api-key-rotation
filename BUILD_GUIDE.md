@@ -57,12 +57,22 @@ streamlit run dashboard/app.py
 Open http://localhost:8501 if the browser does not open automatically.
 
 ## 8. Simulate suspicious behavior
-Put the ORIGINAL key into scripts/simulate_attack.py.
 
-Run:
-python scripts/simulate_attack.py
+Use the ORIGINAL API key returned during key issuance.
 
-The User-Agent changes and traffic becomes a rapid burst. The anomaly detector calculates a risk score. When the configured threshold is crossed, the old key is revoked and a new session-bound key is created.
+Pass the API key through the command line rather than storing it in the script:
+
+python scripts/simulate_attack.py "PASTE_ORIGINAL_API_KEY_HERE"
+
+The script generates suspicious burst traffic using a different client fingerprint.
+The anomaly detector evaluates the changed behavior and calculates a risk score.
+
+When the configured risk threshold is crossed:
+1. The original API key is revoked.
+2. A new session-bound API key is generated.
+3. The rotation event is recorded in the audit log.
+4. The new API key is returned by the API response.
+
 
 ## 9. Verify the rotation
 Open:
