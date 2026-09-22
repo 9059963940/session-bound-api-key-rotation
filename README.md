@@ -1,8 +1,8 @@
 # Session-Bound API Key Rotation via Usage-Pattern Fingerprinting
 
-A local academic security prototype for detecting abnormal API-key usage patterns and automatically rotating suspicious API credentials.
+A local academic security prototype that detects abnormal API-key usage patterns and automatically rotates suspicious API credentials.
 
-The system establishes a behavioral baseline for API keys and evaluates live API requests against that baseline. When abnormal behavior produces a sufficiently high risk score, the system automatically revokes the existing API key and generates a new session-bound API key.
+The system establishes a behavioral baseline for each API key and evaluates live requests against that baseline. When abnormal behavior produces a sufficiently high risk score, the system revokes the existing API key and generates a new session-bound API key.
 
 > **Note:** This is a research/academic prototype intended for local experimentation and demonstration. It is not a production secrets-management system.
 
@@ -10,9 +10,9 @@ The system establishes a behavioral baseline for API keys and evaluates live API
 
 ## Overview
 
-Traditional API-key rotation is often based on fixed schedules or manual intervention.
+Traditional API-key rotation is commonly based on fixed schedules or manual intervention.
 
-This project explores a behavior-driven approach where API-key usage is monitored continuously. The system observes request characteristics, establishes a per-key behavioral baseline, detects deviations using anomaly detection, calculates a risk score, and can automatically rotate the affected credential.
+This project explores a behavior-driven approach in which API-key usage is continuously monitored. The system observes request characteristics, establishes a per-key behavioral baseline, detects deviations using anomaly detection, calculates a risk score, and automatically rotates the affected credential when the configured threshold is exceeded.
 
 ### Core Flow
 
@@ -20,47 +20,31 @@ This project explores a behavior-driven approach where API-key usage is monitore
 Client
    |
    v
-FastAPI Backend
+API Gateway
    |
    v
-API Request Logging
+Request / Usage Profiler
+   |
+   +----------------------+
+   |                      |
+   v                      v
+Behavioral Features   Audit Logging
    |
    v
-Feature Extraction
+Isolation Forest
    |
-   +-------------------------------+
-   |                               |
-   v                               v
-Timing / Endpoint            Client Fingerprint
-Payload / Method             Client IP
-   |                               |
-   +---------------+---------------+
-                   |
-                   v
-          Behavioral Baseline
-                   |
-                   v
-          Isolation Forest
-                   |
-                   v
-         Anomaly / Risk Score
-                   |
-                   v
-          Rotation Decision
-                   |
-        +----------+----------+
-        |                     |
-        v                     v
- Normal Behavior        High-Risk Behavior
-        |                     |
-        v                     v
-  Allow Request         Revoke Old Key
-                              |
-                              v
-                       Generate New Key
-                              |
-                              v
-                       New Session ID
-                              |
-                              v
-                       Audit Rotation
+   v
+Risk Scoring / Decision Engine
+   |
+   +----------------------+
+   |
+   v
+Key Vault
+   |
+   +----------------------+
+   |
+   v
+Revoke Old Key
+   |
+   v
+Generate New Session-Bound Key
