@@ -102,3 +102,27 @@ The project includes automated tests covering:
 Current test result:
 
 11 passed
+
+Demonstrated Security Flow
+
+The end-to-end prototype was validated locally using the following flow:
+
+30 normal requests
+        ↓
+Behavioral baseline established
+        ↓
+Suspicious traffic detected
+        ↓
+Anomaly score: 0.8449
+Risk score: 0.8449
+        ↓
+Configured threshold: 0.65
+        ↓
+Automatic API-key rotation
+        ↓
+Original key revoked
+        ↓
+New session-bound key generated
+        ↓
+New key → HTTP 200
+Old key → HTTP 401
