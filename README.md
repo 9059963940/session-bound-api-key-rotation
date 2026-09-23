@@ -85,3 +85,25 @@ When sufficiently abnormal behavior is detected, the system:
         v                v
   Revoke Old Key   Generate New
                    Session-Bound Key
+
+---
+
+## Verification
+
+The project includes automated tests covering:
+
+- API health check
+- API-key issuance
+- Authorized API access
+- Normal traffic handling
+- Behavioral anomaly detection
+- Automatic key rotation
+- Old-key revocation
+- Missing/invalid API-key rejection
+- Rotation cooldown
+- New-key access after rotation
+
+Current test result:
+
+```text
+11 passed
