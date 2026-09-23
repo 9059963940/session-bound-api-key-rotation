@@ -1,14 +1,13 @@
-# Session-Bound API Key Rotation via Usage-Pattern Fingerprinting
+Session-Bound API Key Rotation via Usage-Pattern Fingerprinting
 
 A behavior-driven API security prototype that detects abnormal API-key usage patterns and automatically rotates suspicious API credentials.
 
 The system establishes a behavioral baseline for each API key, analyzes incoming requests using usage-pattern features, detects anomalous behavior with an Isolation Forest model, calculates a security risk score, and automatically revokes and replaces a compromised API key when the configured risk threshold is exceeded.
 
-> **Note:** This is a research/academic prototype designed for local experimentation and demonstration. It is not a production secrets-management or KMS/HSM system.
+> Note: This is a research/academic prototype designed for local experimentation and demonstration. It is not a production secrets-management or KMS/HSM system.
 
----
 
-## Overview
+Overview
 
 Traditional API-key rotation is commonly based on fixed schedules or manual intervention.
 
@@ -33,11 +32,9 @@ When sufficiently abnormal behavior is detected, the system:
 6. Records the rotation event in the audit log.
 7. Allows the new key to continue legitimate access.
 
----
 
-## Architecture
+Architecture
 
-```text
                          +------------------+
                          |      Client      |
                          +--------+---------+
@@ -86,9 +83,8 @@ When sufficiently abnormal behavior is detected, the system:
   Revoke Old Key   Generate New
                    Session-Bound Key
 
----
 
-## Verification
+Verification
 
 The project includes automated tests covering:
 
@@ -105,5 +101,4 @@ The project includes automated tests covering:
 
 Current test result:
 
-```text
 11 passed
