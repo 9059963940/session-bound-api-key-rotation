@@ -103,6 +103,27 @@ Current test result:
 
 22 passed, 3 warnings
 
+## Demonstrated Security Flow
+
+The end-to-end prototype was validated locally using the following flow:
+
+30 normal requests
+        ↓
+Behavioral baseline established
+        ↓
+Suspicious traffic detected
+        ↓
+Anomaly score and risk score exceed the configured threshold
+        ↓
+Automatic API-key rotation
+        ↓
+Original key revoked
+        ↓
+New session-bound key generated
+        ↓
+New key → HTTP 200
+Old key → HTTP 401
+
 ## Setup and Installation
 
 ### Requirements
