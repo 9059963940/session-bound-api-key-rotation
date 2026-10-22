@@ -101,4 +101,27 @@ The project includes automated tests covering:
 
 Current test result:
 
-11 passed
+22 passed, 3 warnings
+
+## Setup and Installation
+
+### Requirements
+- Python 3.12
+- pip
+
+### Install Dependencies
+Run `python3 -m venv .venv`, then `source .venv/bin/activate`, then `python -m pip install -r requirements.txt`.
+
+### Configure the Admin Token
+Set a unique token in your terminal before starting the application: `export ADMIN_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"`. Keep the token private. The application reads this environment variable and does not automatically load `.env` files.
+
+### Start the Application
+Run `uvicorn app.main:app --reload` and open http://127.0.0.1:8000/docs.
+
+### Run Tests
+Run `python -m pytest -v`.
+
+## Security Notes
+- Never commit real admin tokens or API keys.
+- Treat issued and rotated API keys as secrets.
+- This is an academic prototype, not a production-ready key-management system.

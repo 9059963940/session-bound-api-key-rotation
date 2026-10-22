@@ -131,7 +131,7 @@ if rotation_detected and new_api_key:
         f"{new_response.status_code}"
     )
 
-    print(new_response.text[:1000])
+    print("Response body omitted to avoid exposing sensitive data.")
 
     if new_response.status_code == 200:
         print()

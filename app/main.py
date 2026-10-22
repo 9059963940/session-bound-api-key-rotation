@@ -1,10 +1,17 @@
+
 import time
 import hashlib
+import hmac
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Header, HTTPException, Request
-from pydantic import BaseModel
-
+from fastapi import (
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Depends,
+)
+from pydantic import BaseModel, Field, field_validator
 from .database import (
     init_db,
     get_key,
@@ -18,7 +25,7 @@ from .database import (
 from .key_vault import KeyVault
 from .anomaly import AnomalyDetector
 from .rotation import RotationController
-from .config import HIGH_RISK_THRESHOLD, SERVICE_NAME
+from .config import HIGH_RISK_THRESHOLD, SERVICE_NAME, ADMIN_TOKEN
 
 
 # ============================================================
@@ -28,7 +35,7 @@ from .config import HIGH_RISK_THRESHOLD, SERVICE_NAME
 app = FastAPI(
     title="Session-Bound API Key Rotation",
     description="Behavior-driven API credential security prototype",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 
@@ -42,11 +49,39 @@ rotator = RotationController()
 
 
 # ============================================================
+# ADMIN AUTHENTICATION
+# ============================================================
+
+def require_admin_token(
+    x_admin_token: str = Header(default=""),
+):
+    if not hmac.compare_digest(x_admin_token, ADMIN_TOKEN):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing admin token",
+        )
+
+
+# ============================================================
 # REQUEST MODEL
 # ============================================================
 
 class KeyIssueRequest(BaseModel):
-    service_name: str = SERVICE_NAME
+    service_name: str = Field(
+        default=SERVICE_NAME,
+        min_length=1,
+        max_length=100,
+    )
+
+    @field_validator("service_name")
+    @classmethod
+    def validate_service_name(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("service_name must not be blank")
+
+        return value
 
 
 # ============================================================
@@ -66,7 +101,7 @@ def startup():
 def health():
     return {
         "status": "ok",
-        "service": "session-bound-security-gateway"
+        "service": "session-bound-security-gateway",
     }
 
 
@@ -74,21 +109,25 @@ def health():
 # ADMIN: ISSUE KEY
 # ============================================================
 
-@app.post("/admin/issue-key")
+@app.post(
+    "/admin/issue-key",
+    dependencies=[Depends(require_admin_token)],
+)
 def issue_key(body: KeyIssueRequest):
-    return vault.generate_session_key(
-        body.service_name
-    )
+    return vault.generate_session_key(body.service_name)
 
 
 # ============================================================
 # ADMIN: LIST KEYS
 # ============================================================
 
-@app.get("/admin/keys")
+@app.get(
+    "/admin/keys",
+    dependencies=[Depends(require_admin_token)],
+)
 def keys():
     return {
-        "keys": all_keys()
+        "keys": all_keys(),
     }
 
 
@@ -96,10 +135,13 @@ def keys():
 # ADMIN: LIST ROTATIONS
 # ============================================================
 
-@app.get("/admin/rotations")
+@app.get(
+    "/admin/rotations",
+    dependencies=[Depends(require_admin_token)],
+)
 def rotations():
     return {
-        "rotations": all_rotations()
+        "rotations": all_rotations(),
     }
 
 
@@ -107,10 +149,13 @@ def rotations():
 # ADMIN: LIST REQUESTS
 # ============================================================
 
-@app.get("/admin/requests")
+@app.get(
+    "/admin/requests",
+    dependencies=[Depends(require_admin_token)],
+)
 def requests():
     return {
-        "requests": all_requests()
+        "requests": all_requests(),
     }
 
 
@@ -121,7 +166,7 @@ def requests():
 @app.get("/api/secure-data")
 def secure_data(
     request: Request,
-    x_api_key: str = Header(default="")
+    x_api_key: str = Header(default=""),
 ):
     start = time.perf_counter()
 
@@ -132,7 +177,7 @@ def secure_data(
     if not x_api_key:
         raise HTTPException(
             status_code=401,
-            detail="Missing X-API-Key"
+            detail="Missing X-API-Key",
         )
 
     # --------------------------------------------------------
@@ -144,7 +189,7 @@ def secure_data(
     if not key:
         raise HTTPException(
             status_code=401,
-            detail="Invalid or revoked API key"
+            detail="Invalid or revoked API key",
         )
 
     # --------------------------------------------------------
@@ -159,7 +204,7 @@ def secure_data(
 
     user_agent = request.headers.get(
         "user-agent",
-        "unknown"
+        "unknown",
     )
 
     fingerprint = hashlib.sha256(
@@ -173,7 +218,7 @@ def secure_data(
     response = {
         "message": "Authorized request",
         "service": key["service_name"],
-        "session_id": key["session_id"]
+        "session_id": key["session_id"],
     }
 
     # --------------------------------------------------------
@@ -190,10 +235,6 @@ def secure_data(
 
     # --------------------------------------------------------
     # 6. STORE INITIAL REQUEST
-    #
-    # The request is inserted first because the anomaly
-    # detector needs this latest request as the current
-    # observation.
     # --------------------------------------------------------
 
     request_id = insert_request(
@@ -212,7 +253,7 @@ def secure_data(
             "anomaly_score": None,
             "risk_score": None,
             "security_reason": None,
-            "rotated": 0
+            "rotated": 0,
         }
     )
 
@@ -225,34 +266,46 @@ def secure_data(
     )
 
     # --------------------------------------------------------
-    # 8. INITIAL ROTATION STATUS
-    # --------------------------------------------------------
-
-    rotated = False
-
-    # --------------------------------------------------------
-    # 9. CHECK ROTATION CONDITION
+    # 8. CHECK ROTATION CONDITION
     # --------------------------------------------------------
 
     if result["ready"] and rotator.should_rotate(
         key["key_id"],
         result["risk_score"],
-        HIGH_RISK_THRESHOLD
+        HIGH_RISK_THRESHOLD,
     ):
 
         # ----------------------------------------------------
-        # 10. ROTATE KEY
+        # 9. ROTATE KEY
         # ----------------------------------------------------
 
-        new_key = rotator.rotate(
-            key,
-            result["risk_score"]
-        )
+        try:
+            new_key = rotator.rotate(
+                key,
+                result["risk_score"],
+            )
+        except RuntimeError:
+            update_request_security(
+                request_id=request_id,
+                anomaly_score=result["anomaly_score"],
+                risk_score=result["risk_score"],
+                security_reason=(
+                    "Rotation rejected because the API key "
+                    "was already revoked or rotated"
+                ),
+                rotated=False,
+            )
 
-        rotated = True
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "API key rotation conflicted with another request. "
+                    "Retry with a current API key."
+                ),
+            )
 
         # ----------------------------------------------------
-        # 11. UPDATE REQUEST WITH SECURITY RESULTS
+        # 10. UPDATE REQUEST WITH SECURITY RESULTS
         # ----------------------------------------------------
 
         update_request_security(
@@ -260,11 +313,11 @@ def secure_data(
             anomaly_score=result["anomaly_score"],
             risk_score=result["risk_score"],
             security_reason=result["reason"],
-            rotated=True
+            rotated=True,
         )
 
         # ----------------------------------------------------
-        # 12. RETURN ROTATION RESPONSE
+        # 11. RETURN ROTATION RESPONSE
         # ----------------------------------------------------
 
         return {
@@ -275,12 +328,12 @@ def secure_data(
                 "anomaly_score": result["anomaly_score"],
                 "reason": result["reason"],
                 "new_session_id": new_key["session_id"],
-                "new_api_key": new_key["api_key"]
-            }
+                "new_api_key": new_key["api_key"],
+            },
         }
 
     # --------------------------------------------------------
-    # 13. NO ROTATION
+    # 12. NO ROTATION
     # --------------------------------------------------------
 
     update_request_security(
@@ -288,11 +341,11 @@ def secure_data(
         anomaly_score=result["anomaly_score"],
         risk_score=result["risk_score"],
         security_reason=result["reason"],
-        rotated=False
+        rotated=False,
     )
 
     # --------------------------------------------------------
-    # 14. NORMAL SECURITY RESPONSE
+    # 13. NORMAL SECURITY RESPONSE
     # --------------------------------------------------------
 
     return {
@@ -301,6 +354,6 @@ def secure_data(
             "rotated": False,
             "risk_score": result["risk_score"],
             "anomaly_score": result["anomaly_score"],
-            "reason": result["reason"]
-        }
+            "reason": result["reason"],
+        },
     }

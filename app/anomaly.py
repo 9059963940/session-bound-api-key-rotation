@@ -61,15 +61,13 @@ class AnomalyDetector:
         # PHASE 3: EXTRACT FEATURES
         # ---------------------------------------------------------
 
-        X = np.array(
-            extract_features(baseline),
+        all_features = np.array(
+            extract_features(requests),
             dtype=float
         )
 
-        current_X = np.array(
-            extract_features(current),
-            dtype=float
-        )
+        X = all_features[:-1]
+        current_X = all_features[-1:]
 
         # ---------------------------------------------------------
         # PHASE 4: TRAIN ISOLATION FOREST
@@ -111,21 +109,29 @@ class AnomalyDetector:
             not in known_endpoints
         )
 
+        known_fingerprints = {
+            r["client_fingerprint"]
+            for r in baseline
+        }
+
+        unfamiliar_fingerprint = (
+            current[0]["client_fingerprint"]
+            not in known_fingerprints
+        )
+
         risk = anomaly_score
 
         # New/unfamiliar endpoint
         if unfamiliar_endpoint:
-            risk = min(
-                1.0,
-                risk + 0.20
-            )
+            risk = min(1.0, risk + 0.20)
+
+        # A client fingerprint not seen in this key's baseline
+        if unfamiliar_fingerprint:
+            risk = min(1.0, risk + 0.45)
 
         # Very large payload
         if current[0]["payload_size"] > 10000:
-            risk = min(
-                1.0,
-                risk + 0.10
-            )
+            risk = min(1.0, risk + 0.10)
 
         # ---------------------------------------------------------
         # PHASE 6: RETURN SECURITY RESULT
@@ -142,6 +148,7 @@ class AnomalyDetector:
                 4
             ),
             "unfamiliar_endpoint": unfamiliar_endpoint,
+            "unfamiliar_fingerprint": unfamiliar_fingerprint,
             "reason": (
                 "Live behavior compared against "
                 "the per-key baseline"

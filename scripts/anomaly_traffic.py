@@ -58,7 +58,7 @@ def run_anomaly_test(api_key):
                 new_key = security.get("new_api_key")
 
                 if new_key:
-                    print(f"New API key generated: {new_key}")
+                    print("Replacement API key generated; value not displayed.")
 
                 print()
                 print("The original API key has been revoked.")
