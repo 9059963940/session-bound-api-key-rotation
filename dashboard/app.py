@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 
@@ -102,19 +103,48 @@ st.markdown(
 # ============================================================
 
 def fetch_json(url):
-    """Fetch JSON data from the FastAPI backend."""
+    """Fetch JSON data, authenticating protected admin endpoints."""
+
+    headers = {}
+
+    if url in (KEYS_URL, REQUESTS_URL, ROTATIONS_URL):
+        admin_token = os.environ.get("ADMIN_TOKEN", "")
+        if not admin_token:
+            st.error(
+                "ADMIN_TOKEN is missing. Start Streamlit after running "
+                "source .admin_env in this terminal."
+            )
+            return None
+
+        headers["X-Admin-Token"] = admin_token
 
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10,
+        )
+
+        if response.status_code in (401, 403):
+            st.error(
+                f"Dashboard authentication failed for {url}. "
+                "Check that the backend and dashboard use the same "
+                "ADMIN_TOKEN."
+            )
+            return None
+
         response.raise_for_status()
         return response.json()
 
-    except (
-        requests.exceptions.ConnectionError,
-        requests.exceptions.Timeout,
-        requests.exceptions.RequestException,
-        ValueError,
-    ):
+    except requests.exceptions.RequestException as exc:
+        st.error(
+            f"Could not fetch dashboard data from {url}: "
+            f"{type(exc).__name__}."
+        )
+        return None
+
+    except ValueError:
+        st.error(f"The backend returned invalid JSON for {url}.")
         return None
 
 
